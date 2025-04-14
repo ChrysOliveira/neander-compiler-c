@@ -1,0 +1,6 @@
+PROGRAMA "u":
+INICIO
+A = 5
+B = 5
+RES=	A * B + B
+FIM
