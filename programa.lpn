@@ -2,5 +2,6 @@ PROGRAMA "u":
 INICIO
 A = 5
 B = 5
-RES=	A * B + B
+C = A + B
+RES=	(A * B + B) * C
 FIM
