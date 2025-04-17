@@ -1,7 +1,8 @@
-PROGRAMA "u":
+PROGRAMA "exemplo":
 INICIO
 A = 5
 B = 5
-C = A + B
-RES=	(A * B + B) * C
+C = A + B + D
+D = 6
+RES=	(A * B + B) / C
 FIM

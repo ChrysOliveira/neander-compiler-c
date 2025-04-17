@@ -30,10 +30,129 @@ typedef struct {
   char lexeme[64];
 } Token;
 
+typedef struct instrucao {
+  char name[4];
+  char var;
+  struct instrucao *next;
+} Instrucao;
+
 // Variáveis globais para o lexer
 const char *src; // ponteiro para o código-fonte
 int pos = 0;     // posição atual no código-fonte
 Token currentToken;
+
+Instrucao *instrucao_l = NULL;
+
+void create_instrucao(char instrucao[6]) {
+  Instrucao *new = malloc(sizeof(Instrucao));
+  strncpy(new->name, instrucao, 3);
+  new->name[3] = '\0';
+  new->var = instrucao[4];
+  new->next = NULL;
+
+  if (instrucao_l == NULL) {
+    instrucao_l = new;
+  } else {
+    Instrucao *temp = instrucao_l;
+    while (temp->next != NULL) {
+      temp = temp->next;
+    }
+    temp->next = new;
+  }
+}
+
+void print_instrucao() {
+  printf("Instrucoes:\n");
+
+  Instrucao *temp = instrucao_l;
+  while (temp != NULL) {
+    printf("{ name: %s | var: %c | next: %s } %s\n", temp->name, temp->var,
+           temp->next->name, temp->next == NULL ? "" : "->");
+
+    temp = temp->next;
+  }
+}
+
+int exists_var_in_instruction_list(char *arr, int size, char var) {
+  for (int i = 0; i < size; i++) {
+    if (arr[i] == var) {
+      return 1;
+    }
+  }
+
+  return 0;
+}
+
+void create_assembly() {
+  printf("Criando assembly...\n");
+
+  FILE *asm_file = fopen("assembly.asm", "w");
+  if (!asm_file) {
+    perror("Error creating binary file");
+    exit(EXIT_FAILURE);
+  }
+
+  fprintf(asm_file, ".DATA\n\n");
+
+  Instrucao *temp_data = instrucao_l;
+
+  char variaveis[64];
+  int i = 0;
+
+  while (temp_data != NULL) {
+    if (strcmp(temp_data->name, "LDC") == 0) {
+      fprintf(asm_file, "%c = %d\n", temp_data->next->var,
+              temp_data->var - '0');
+      variaveis[i] = temp_data->next->var;
+      i++;
+    } else if (strcmp(temp_data->name, "STA") == 0 &&
+               !exists_var_in_instruction_list(variaveis, 64, temp_data->var)) {
+      fprintf(asm_file, "%c = ?\n", temp_data->var);
+      variaveis[i] = temp_data->var;
+      i++;
+    } else if (temp_data->var == 'R') {
+      fprintf(asm_file, "%c = ?\n", temp_data->var);
+      variaveis[i] = temp_data->var;
+      i++;
+    }
+    temp_data = temp_data->next;
+  }
+
+  fprintf(asm_file, "\n");
+
+  fprintf(asm_file, ".CODE\n.ORG 0\n");
+
+  Instrucao *temp_instrucao = instrucao_l;
+  while (temp_instrucao != NULL) {
+
+    while (strcmp(temp_instrucao->name, "LDC") == 0) {
+      temp_instrucao = temp_instrucao->next->next;
+    }
+
+    if (strcmp(temp_instrucao->name, "LDA") == 0 &&
+        strcmp(temp_instrucao->next->name, "LDA") == 0) {
+      fprintf(asm_file, "%s %c\n", temp_instrucao->name, temp_instrucao->var);
+      fprintf(asm_file, "%s %c\n", temp_instrucao->next->next->name,
+              temp_instrucao->next->var);
+
+      temp_instrucao = temp_instrucao->next->next->next;
+      continue;
+    } else if (strcmp(temp_instrucao->name, "LDA") == 0 &&
+               (strcmp(temp_instrucao->next->name, "ADD") == 0 ||
+                strcmp(temp_instrucao->next->name, "SUB") == 0 ||
+                strcmp(temp_instrucao->next->name, "MUL") == 0 ||
+                strcmp(temp_instrucao->next->name, "DIV") == 0)) {
+      fprintf(asm_file, "%s %c\n", temp_instrucao->next->name,
+              temp_instrucao->var);
+      temp_instrucao = temp_instrucao->next->next;
+      continue;
+    } else if (strcmp(temp_instrucao->name, "STA") == 0) {
+      fprintf(asm_file, "%s %c\n", temp_instrucao->name, temp_instrucao->var);
+      temp_instrucao = temp_instrucao->next;
+      continue;
+    }
+  }
+}
 
 // Função auxiliar para ignorar espaços, tabulações e quebras de linha
 void skip_whitespace() {
@@ -222,6 +341,8 @@ void parse_program() {
     // Após calcular a expressão, emita código para armazenar o resultado na
     // variável (ex.: STA varName)
     printf("STA %s\n", varName);
+    char instrucao[6] = {'S', 'T', 'A', ' ', varName[0], '\0'};
+    create_instrucao(instrucao);
     // Suporta a quebra de linha entre statements
     // nextToken();   // se necessário
   }
@@ -234,6 +355,9 @@ void parse_program() {
   // Aqui, a geração pode ser, por exemplo, armazenar o resultado em uma área
   // especial
   printf("STA RES\n"); // ou a instrução apropriada
+  //
+  char instrucao[6] = {'S', 'T', 'A', ' ', 'R', '\0'};
+  create_instrucao(instrucao);
 
   // <end> ::= "FIM"
   consume(TOKEN_FIM);
@@ -252,10 +376,15 @@ void parse_expr() {
     // (dependendo da estratégia)
     parse_term();
     // Emite o código correspondente à operação:
-    if (op == TOKEN_PLUS)
+    if (op == TOKEN_PLUS) {
       printf("ADD\n");
-    else
+      char instrucao[6] = {'A', 'D', 'D', ' ', ' ', '\0'};
+      create_instrucao(instrucao);
+    } else {
       printf("SUB\n");
+      char instrucao[6] = {'S', 'U', 'B', ' ', ' ', '\0'};
+      create_instrucao(instrucao);
+    }
   }
 }
 
@@ -266,10 +395,15 @@ void parse_term() {
     TokenType op = currentToken.type;
     consume(op);
     parse_factor();
-    if (op == TOKEN_MULT)
+    if (op == TOKEN_MULT) {
       printf("MUL\n");
-    else
+      char instrucao[6] = {'M', 'U', 'L', ' ', ' ', '\0'};
+      create_instrucao(instrucao);
+    } else {
       printf("DIV\n");
+      char instrucao[6] = {'D', 'I', 'V', ' ', ' ', '\0'};
+      create_instrucao(instrucao);
+    }
   }
 }
 
@@ -278,10 +412,18 @@ void parse_factor() {
   if (currentToken.type == TOKEN_NUM) {
     // Emite código para carregar o número
     printf("LDC %s\n", currentToken.lexeme);
+
+    char instrucao[6] = {'L', 'D', 'C', ' ', currentToken.lexeme[0], '\0'};
+    create_instrucao(instrucao);
+
     consume(TOKEN_NUM);
   } else if (currentToken.type == TOKEN_ID) {
     // Emite código para carregar a variável
     printf("LDA %s\n", currentToken.lexeme);
+
+    char instrucao[6] = {'L', 'D', 'A', ' ', currentToken.lexeme[0], '\0'};
+    create_instrucao(instrucao);
+
     consume(TOKEN_ID);
   } else if (currentToken.type == TOKEN_LPAREN) {
     consume(TOKEN_LPAREN);
@@ -293,13 +435,14 @@ void parse_factor() {
 }
 
 int main(int argc, char *argv[]) {
-  if (argc < 2) {
-    fprintf(stderr, "Uso: %s <arquivo-fonte>\n", argv[0]);
-    exit(EXIT_FAILURE);
-  }
+  /* if (argc < 2) { */
+  /*   fprintf(stderr, "Uso: %s <arquivo-fonte>\n", argv[0]); */
+  /*   exit(EXIT_FAILURE); */
+  /* } */
 
   // Carrega o arquivo-fonte (para simplicidade, use um buffer grande)
-  FILE *fp = fopen(argv[1], "r");
+  /* FILE *fp = fopen(argv[1], "r"); */
+  FILE *fp = fopen("programa.lpn", "r");
   if (!fp) {
     perror("Erro ao abrir o arquivo");
     exit(EXIT_FAILURE);
@@ -320,6 +463,9 @@ int main(int argc, char *argv[]) {
 
   // Inicia o parsing do programa
   parse_program();
+
+  print_instrucao();
+  create_assembly();
 
   // Finaliza gerando o código assembly (os 'printf' acima simulam a emissão do
   // código)

@@ -1,0 +1,4 @@
+Operacoes somente com variaveis
+Limite de 64 variaveis
+Nao podemos ter uma variavel chamada "R"
+Somente valores positivos

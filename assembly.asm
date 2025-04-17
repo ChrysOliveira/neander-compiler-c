@@ -1,0 +1,19 @@
+.DATA
+
+A = 5
+B = 5
+C = ?
+D = 6
+R = ?
+
+.CODE
+.ORG 0
+LDA A
+ADD B
+ADD D
+STA C
+LDA A
+MUL B
+ADD B
+DIV C
+STA R
